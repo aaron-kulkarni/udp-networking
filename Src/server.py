@@ -1,7 +1,6 @@
 import socket
 import struct
 import sys
-import pyuv
 
 BUFFER_SIZE = 2048
 
@@ -18,7 +17,6 @@ def main():
 
     while True:
         packet, remote_addr = s.recvfrom(BUFFER_SIZE)
-        print(packet)
         
         header = unpack(packet[:12])
         if checkHeader(header) == False:
@@ -26,13 +24,14 @@ def main():
 
         sequence = header[3]
         session = header[4]
+
         
         if int(header[2]) == 0: #HELLO message
             message = pack(0, sequence, session)
             s.sendto(message, remote_addr)
         elif int(header[2]) == 1: #DATA message
             data = packet[12:].decode('utf-8')
-            print(data, end='')
+            print(data)
             message = pack(2, sequence, session)
             s.sendto(message, remote_addr)
         # elif int(header[2]) == 2: #ALIVE message
@@ -40,11 +39,11 @@ def main():
         elif int(header[2]) == 3: #GOODBYE message
             message = pack(3, sequence, session)
             s.sendto(message, remote_addr)
-            return
+            print("Session closed")
             
 
 def checkHeader(header):
-    if header[0] != 0xC356 or header[1] != 1:
+    if int(header[0]) != 0xC356 or int(header[1]) != 1:
         return False
     return True   
 

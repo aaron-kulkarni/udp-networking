@@ -30,6 +30,8 @@ def main():
     seqNumber = 0
     global sessionID
     sessionID = random.randint(0, 4294967295)
+    global closingStarted
+    closingStarted = False
     
     
     
@@ -45,21 +47,17 @@ def main():
         packet = s.recvfrom(BUFFER_SIZE)[0] #wait for handshake hello message
         timerThread.cancel()
         header = unpack(packet[:12])
-        if checkMagicAndVersion(header) == False: #ignore wrong magic and version packets
+        if checkMagicAndVersion(header) ==  False: #ignore wrong magic and version packets
             continue
-        if header[2] == GOODBYE:
+        if int(header[2]) == GOODBYE:
             s.close()
             return
-        print(0)
-        if checkSessionID(header) == False or header[2] == DATA or header[2] == ALIVE:
+        if checkSessionID(header) == False or int(header[2]) == DATA or int(header[2]) == ALIVE:
             closing(HOST, PORT, s)
-            print(1)
         break
 
     global q
     q = Queue()
-
-    print(2)
 
     socketThread = threading.Thread(target=handle_socket, args=(HOST, PORT, s))
     socketThread.start()
@@ -80,7 +78,7 @@ def handle_keyboard(HOST, PORT, s):
             q.put("q")
             keepGoing = False
             closing(HOST, PORT, s)
-        q.put(text)
+        q.put(text.rstrip())
 
     return
 
@@ -94,6 +92,11 @@ def handle_socket(HOST, PORT, s):
         #send message
         seqNumber += 1
         text = q.get()
+        if text == "q":
+            keepGoing = False
+            message = pack(GOODBYE, seqNumber, sessionID)
+            closing(HOST, PORT, s)
+            return
         message = pack(DATA, seqNumber, sessionID)
         data_message = message + text.encode('utf-8')
         s.sendto(data_message, (HOST, PORT))
@@ -106,10 +109,10 @@ def handle_socket(HOST, PORT, s):
             header = unpack(packet[:12])
             if checkMagicAndVersion(header) == False: #ignore wrong magic and version packets
                 continue
-            if header[2] == GOODBYE:
+            if int(header[2]) == GOODBYE:
                 keepGoing = False
                 closeSocket(s)
-            if checkSessionID or header[2] == DATA or header[2] == HELLO:
+            if checkSessionID(header) == False or int(header[2]) == DATA or int(header[2] == HELLO):
                 keepGoing = False
                 closing(HOST, PORT, s)
             break
@@ -117,6 +120,12 @@ def handle_socket(HOST, PORT, s):
     return
 
 def closing(HOST, PORT, s):
+    global closingStarted
+
+    if closingStarted == True: #closing has already been initiated before.
+        return     
+
+    closingStarted = True
     message = pack(GOODBYE, seqNumber, sessionID)
     s.sendto(message, (HOST, PORT))
 
@@ -154,69 +163,3 @@ def unpack(data):
 
 if __name__ == "__main__":
     main()
-
-# def session(HOST, PORT, s, q):
-
-#     message = pack(0, 1, 1)
-#     s.sendto(message, (HOST, PORT)) #sends hello message
-    
-#     packet, remote_addr = s.recvfrom(BUFFER_SIZE) #wait for handshake hello message
-    
-#     header = unpack(packet[:12])
-#     if checkHeader(header) == False:
-#         return
-        
-#     if int(header[2]) == 0: #HELLO message
-#         while True:
-#             text = sys.stdin.readline()
-#             # Terminates server if input is EOF or 'q'
-#             if (not text or (text == "q\n" and sys.stdin.isatty())):
-#                 break
-#             message = pack(1, 1, 1)
-#             data_message = message + text.encode('utf-8')
-#             s.sendto(data_message, (HOST, PORT))
-#             packet, remote_addr = s.recvfrom(BUFFER_SIZE)
-#             header = unpack(packet[:12])
-#             if checkHeader(header) == False:
-#                 break
-#             if int(header[2]) != 2: #if client receives hello, data, or goodbye
-#                 break
-#         message = pack(3, 1, 1) #goodbye message
-#         s.sendto(message, (HOST, PORT))
-#         return     
-
-    # s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    # message = pack(0, 1, 1)
-    # s.sendto(message, (HOST, PORT)) #sends hello message
-    
-    # packet, remote_addr = s.recvfrom(BUFFER_SIZE) #wait for handshake hello message
-    
-    # header = unpack(packet[:12])
-    # if checkHeader(header) == False:
-    #     return
-
-    # if int(header[2]) == 0: #HELLO message
-    #     while True:
-    #         # worker_thread = threading.Thread(target=session, args=(HOST, PORT, s))
-    #         # worker_thread.start()
-    #         text = sys.stdin.readline()
-    #         # Terminates server if input is EOF or 'q'
-    #         if (not text or (text == "q\n" and sys.stdin.isatty())):
-    #             break
-    #         message = pack(1, 1, 1)
-    #         data_message = message + text.encode('utf-8')
-    #         s.sendto(data_message, (HOST, PORT))
-    #         packet, remote_addr = s.recvfrom(BUFFER_SIZE)
-    #         header = unpack(packet[:12])
-    #         if checkHeader(header) == False:
-    #             break
-    #         if int(header[2]) != 2: #if client receives hello, data, or goodbye
-    #             break
-    #     message = pack(3, 1, 1) #goodbye message
-    #     s.sendto(message, (HOST, PORT))
-    #     return
-
-    #def pack(command, seq, sessionID):
-        #0 HELLO, 1 DATA, 2 ALIVE, 3 GOODBYE
-        # message = pack(1, 1, 1)
-        # data_message = message + text.encode('utf-8')
