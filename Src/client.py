@@ -1,9 +1,11 @@
+import os
 import socket
 import struct
 import sys
 import threading
 from queue import Queue
 import random
+import time
 
 BUFFER_SIZE = 2048
 HELLO = 0
@@ -71,6 +73,7 @@ def main():
 
 def handle_keyboard(HOST, PORT, s):
     global keepGoing
+
     while keepGoing:
         text = sys.stdin.readline()
         # Terminates client if input is EOF or 'q'
@@ -89,6 +92,17 @@ def handle_socket(HOST, PORT, s):
 
 
     while keepGoing:
+        while q.empty(): #if there are no outgoing messages, listen for a goodbye from the server.
+            try:
+                packet = s.recvfrom(BUFFER_SIZE, socket.MSG_DONTWAIT)[0]
+                header = unpack(packet[:12])
+                if int(header[2]) == GOODBYE:
+                    keepGoing = False
+                    closeSocket(s)
+            except BlockingIOError as e:
+                time.sleep(0.1)
+                pass
+            
         #send message
         seqNumber += 1
         text = q.get()
@@ -143,7 +157,7 @@ def closing(HOST, PORT, s):
         
 def closeSocket(s):
     s.close()
-    exit(0)
+    os._exit(0)
 
 def checkSessionID(header): #checks sessionID
     if int(header[4] == sessionID):
