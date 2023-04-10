@@ -5,10 +5,10 @@ import pyuv
 
 
 class Session:
-    def __init__(self, seq, addr):
+    def __init__(self, seq, addr, timer):
         self.seq = seq
         self.addr = addr
-        #self.timer = timer
+        self.timer = timer
 
 BUFFER_SIZE = 2048
 
@@ -33,12 +33,11 @@ def main():
     s.bind((HOST, PORT))
     s.start_recv(handle_recv_packet)
     k.start_read(handle_keyboard_input)
-    # timer = pyuv.Timer(loop)
     loop.run()
     # timer.start()
 
 
-def handle_recv_packet(handle, addr, flags, packet, error):
+def handle_recv_packet(handle, addr, flags, packet, error): #used for socket communication
     header = unpack(packet[:12])
     if checkMagicAndVersion(header) == False: 
         return
@@ -48,14 +47,17 @@ def handle_recv_packet(handle, addr, flags, packet, error):
         #first message must be a hello message
         if int(header[2]) == HELLO:
             message = pack(HELLO, sequence, sessionID)
-            #s.sendto(message, addr) #not sure if addr variable is server addr of client addr
             handle.send(addr, message)
-            newSession = Session(sequence, addr)
+            timer = pyuv.Timer(loop)
+            newSession = Session(sequence, addr, timer)
             sessionDict[sessionID] = newSession
+            timer.start(timeoutSession, 10, 0)
         else: #first message in a session is not a hello. discard packet.
             return
     else: #session already exists
         curSession = sessionDict[sessionID]
+        curSession.timer.stop()
+        curSession.timer.start(timeoutSession, 10, 0)
         if int(header[2]) != DATA or sequence < curSession.seq:
             endSession(handle, sequence, sessionID, addr)
             return
@@ -86,16 +88,25 @@ def handle_keyboard_input(tty_handle, data, error):
 def endServer():
     for sessionID in list(sessionDict):
         sessionData = sessionDict.get(sessionID)
-        endSession(s, sessionData.seq, sessionID, sessionData.addr)
+        endSession(s, sessionID, sessionData)
     s.stop_recv()
     k.stop_read()
     loop.stop()
     pyuv.Async(loop, empty_event_func)
     return
 
-def endSession(handle, sequence, sessionID, addr):
-    message = pack(GOODBYE, sequence, sessionID)
-    handle.send(addr, message)
+def timeoutSession(timer):
+    for sessionID in sessionDict:
+        session = sessionDict.get(sessionID)
+        if session.timer == timer:
+            endSession(s, sessionID, session)
+            return
+    print("Error. Tried to timeout session that is not in session dictionary.")
+
+def endSession(handle, sessionID, session):
+    message = pack(GOODBYE, session.seq, sessionID)
+    handle.send(session.addr, message)
+    session.timer.stop()
     sessionDict.pop(sessionID)
     return
 
