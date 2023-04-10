@@ -15,18 +15,21 @@ GOODBYE = 3
 INTERVAL = 2.0
 
 def main():
+    runClient(sys.argv)
 
-    if len(sys.argv) != 3:
+def runClient(input):
+
+    if len(input) != 3:
         print("Incorrect number of arguments. Please enter 2 arguments. First should be host second should be the port number.")
         return
     
-    HOST = sys.argv[1]
-    PORT = int(sys.argv[2])
+    HOST = input[1]
+    PORT = int(input[2])
 
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
-
-    global keepGoing #used for intercommunication between socketThread and keyboardThread. when one thread closes, it signals to the other to close as well.
+    #used for intercommunication between socketThread and keyboardThread. when one thread closes, it signals to the other to close as well.
+    global keepGoing 
     keepGoing = True
     global seqNumber #sequence number for messages
     seqNumber = 0

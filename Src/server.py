@@ -21,14 +21,18 @@ ALIVE = 2
 GOODBYE = 3
 INTERVAL = 2.0
 sessionDict = {}
+output = []
 
 def main():
+    runServer(sys.argv)
 
-    if len(sys.argv) != 2:
+def runServer(input):
+
+    if len(input) != 2:
         print("Incorrect number of arguments. Please enter 1 arguments for the port number.")
         return
     
-    PORT = int(sys.argv[1])
+    PORT = int(input[1])
     HOST = '0.0.0.0'
     s.bind((HOST, PORT))
     s.start_recv(handle_recv_packet)
@@ -38,6 +42,8 @@ def main():
 
 
 def handle_recv_packet(handle, addr, flags, packet, error): #used for socket communication
+    global output
+    
     header = unpack(packet[:12])
     if checkMagicAndVersion(header) == False: 
         return
@@ -51,6 +57,7 @@ def handle_recv_packet(handle, addr, flags, packet, error): #used for socket com
             timer = pyuv.Timer(loop)
             newSession = Session(sequence, addr, timer)
             sessionDict[sessionID] = newSession
+            output = ['Session created']
             timer.start(timeoutSession, 10, 0)
         else: #first message in a session is not a hello. discard packet.
             return
@@ -58,15 +65,20 @@ def handle_recv_packet(handle, addr, flags, packet, error): #used for socket com
         curSession = sessionDict[sessionID]
         curSession.timer.stop()
         curSession.timer.start(timeoutSession, 10, 0)
-        if int(header[2]) != DATA or sequence < curSession.seq:
+        
+        if int(header[2] == GOODBYE):
+            output.append('GOODBYE from client.')
             endSession(handle, sequence, sessionID, addr)
             return
-        if sequence == curSession.seq: #Duplicate packet. discard packet but keep session alive.
+        elif int(header[2]) != DATA or sequence < curSession.seq:
+            endSession(handle, sequence, sessionID, addr)
+            return
+        elif sequence == curSession.seq: #Duplicate packet. discard packet but keep session alive.
             message = pack(ALIVE, sequence, sessionID)
             handle.send(addr, message)
             print("Duplicate packet!")
             return
-        if sequence > curSession.seq + 1: #Greater sequence # than expected
+        elif sequence > curSession.seq + 1: #Greater sequence # than expected
             packetsLost = sequence - (curSession.seq + 1)
             for i in range(packetsLost):
                 print("Lost packet!")
@@ -74,6 +86,7 @@ def handle_recv_packet(handle, addr, flags, packet, error): #used for socket com
         curSession.seq = sequence
         data = packet[12:].decode('utf-8')
         print(data)
+        output.append(data)
         message = pack(ALIVE, sequence, sessionID)
         handle.send(addr, message)
     
@@ -108,6 +121,7 @@ def endSession(handle, sessionID, session):
     handle.send(session.addr, message)
     session.timer.stop()
     sessionDict.pop(sessionID)
+    output.append('Session closed')
     return
 
 def empty_event_func(async_handle): #empty_event_func is needed for pyuv. check documentation for reason.
