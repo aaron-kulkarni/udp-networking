@@ -1,6 +1,5 @@
 import sys
 sys.path.append('../Src/')
-sys.path.append('../Src/')
 
 
 from server import runServer, endServer, output
