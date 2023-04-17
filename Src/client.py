@@ -15,10 +15,9 @@ GOODBYE = 3
 INTERVAL = 2.0
 
 def main():
-    runClient(sys.argv)
+    runClient(sys.argv, sys.stdin)
 
-def runClient(input):
-
+def runClient(input, scanner):
     if len(input) != 3:
         print("Incorrect number of arguments. Please enter 2 arguments. First should be host second should be the port number.")
         return
@@ -67,20 +66,20 @@ def runClient(input):
     socketThread = threading.Thread(target=handle_socket, args=(HOST, PORT, s))
     socketThread.start()
 
-    keyboardThread = threading.Thread(target=handle_keyboard, args=(HOST, PORT, s))
+    keyboardThread = threading.Thread(target=handle_keyboard, args=(HOST, PORT, s, scanner))
     keyboardThread.start()
     
     socketThread.join()
     keyboardThread.join()
 
 
-def handle_keyboard(HOST, PORT, s):
+def handle_keyboard(HOST, PORT, s, scanner):
     global keepGoing
 
     while keepGoing:
-        text = sys.stdin.readline()
+        text = scanner.readline()
         # Terminates client if input is EOF or 'q'
-        if (not text or (text == "q\n" and sys.stdin.isatty())):
+        if (not text or (text == "q\n" and scanner.isatty())):
             q.put("q")
             keepGoing = False
             closing(HOST, PORT, s)

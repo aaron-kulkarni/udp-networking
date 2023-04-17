@@ -27,7 +27,6 @@ def main():
     runServer(sys.argv)
 
 def runServer(input):
-
     if len(input) != 2:
         print("Incorrect number of arguments. Please enter 1 arguments for the port number.")
         return
@@ -68,10 +67,10 @@ def handle_recv_packet(handle, addr, flags, packet, error): #used for socket com
         
         if int(header[2] == GOODBYE):
             output.append('GOODBYE from client.')
-            endSession(handle, sequence, sessionID, addr)
+            endSession(handle, sessionID, curSession)
             return
         elif int(header[2]) != DATA or sequence < curSession.seq:
-            endSession(handle, sequence, sessionID, addr)
+            endSession(handle, sessionID, curSession)
             return
         elif sequence == curSession.seq: #Duplicate packet. discard packet but keep session alive.
             message = pack(ALIVE, sequence, sessionID)
